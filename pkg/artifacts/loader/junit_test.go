@@ -29,7 +29,11 @@ func TestNewFlakReport(t *testing.T) {
 	err := report.LoadReport(ImportFromLocalDirectory("./testData/zip/"))
 	assert.NoError(t, err)
 
-	data, err := report.GenerateReport("./tmp/tmp.yaml")
+	data, err := report.GenerateReport("")
+	assert.NoError(t, err)
+	assert.NotEmpty(t, data)
+
+	data, err =report.GenerateShortReport()
 	assert.NoError(t, err)
 	assert.NotEmpty(t, data)
 }

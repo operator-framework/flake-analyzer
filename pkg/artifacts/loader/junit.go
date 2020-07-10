@@ -18,11 +18,11 @@ import (
 
 type FlakReport struct {
 	filter           reportFilter
-	TotalCount       int         `json:"total_test_count"`   // All imported test reports have failures
-	FlakTestCount    int         `json:"flak_test_count"`    // Number of test suit report
-	SkippedTestCount int         `json:"skipped_test_count"` // Number of test suit report
-	FlakTests        []TestEntry `json:"flak_tests"`         // Sorted by counts and number of commits
-	SkippedTests     []TestEntry `json:"skipped_tests"`
+	TotalTestCount   int         `json:"total_test_count"`     // All imported test reports have failures
+	FlakTestCount    int         `json:"flak_test_count"`      // Number of test suit report
+	SkippedTestCount int         `json:"skipped_test_count"`   // Number of test suit report
+	FlakTests        []TestEntry `json:"flak_tests",omitempty` // Sorted by counts and number of commits
+	SkippedTests     []TestEntry `json:"skipped_tests",omitempty`
 	flakTestMap      testMap     // map[class name + test name]TestEntry
 	skippedTestMap   testMap
 }
@@ -33,16 +33,16 @@ type TestEntry struct {
 	ClassName       string       `json:"class_name"`
 	Name            string       `json:"name"`
 	Counts          int          `json:"counts"`
-	Details         []TestDetail `json:"details"`
+	Details         []TestDetail `json:"details",omitempty`
 	Commits         []string     `json:"commits"`
 	MeanDurationSec float64      `json:"mean_duration_sec"`
 }
 
 type TestDetail struct {
 	Count     int    `json:"count"`
-	Error     error  `json:"error"`
-	SystemOut string `json:"system_out"`
-	SystemErr string `json:"system_err"`
+	Error     error  `json:"error",omitempty`
+	SystemOut string `json:"system_out",omitempty`
+	SystemErr string `json:"system_err",omitempty`
 }
 
 type reportFilter struct {
@@ -132,7 +132,7 @@ func (r *reportFilter) complete() error {
 func NewFlakReport() *FlakReport {
 	return &FlakReport{
 		filter:         reportFilter{},
-		TotalCount:     0,
+		TotalTestCount: 0,
 		FlakTestCount:  0,
 		FlakTests:      []TestEntry{},
 		SkippedTests:   []TestEntry{},
@@ -250,7 +250,7 @@ func (f *FlakReport) addTests(dir string) error {
 			}
 		}
 
-		f.TotalCount = f.TotalCount + 1
+		f.TotalTestCount = f.TotalTestCount + 1
 	}
 	return nil
 }
@@ -264,14 +264,19 @@ func (t *testMap) loadTestEntries(test junit.Test, commit string) {
 			Name:            test.Name,
 			ClassName:       test.Classname,
 			MeanDurationSec: test.Duration.Seconds(),
-			Details: []TestDetail{
-				{
-					Count:     1,
-					Error:     test.Error,
-					SystemOut: test.SystemOut,
-					SystemErr: test.SystemErr,
-				},
-			},
+			Details: func() []TestDetail {
+				if test.Error == nil && test.SystemOut == "" && test.SystemErr == "" {
+					return nil
+				}
+				return []TestDetail{
+					{
+						Count:     1,
+						Error:     test.Error,
+						SystemOut: test.SystemOut,
+						SystemErr: test.SystemErr,
+					},
+				}
+			}(),
 		}
 	} else {
 
@@ -281,22 +286,23 @@ func (t *testMap) loadTestEntries(test junit.Test, commit string) {
 			Name:            test.Name,
 			ClassName:       test.Classname,
 			MeanDurationSec: (test.Duration.Seconds()-existing.MeanDurationSec)/float64(existing.Counts+1) + existing.MeanDurationSec,
-			Details: []TestDetail{
-				func() TestDetail {
-					for _, detail := range existing.Details {
-						if detail.SystemErr == test.SystemErr && detail.SystemOut == test.SystemOut && detail.Error == test.Error {
-							detail.Count = detail.Count + 1
-							return detail
-						}
+			Details: func() []TestDetail {
+				if test.Error == nil && test.SystemOut == "" && test.SystemErr == "" {
+					return existing.Details
+				}
+				for i, detail := range existing.Details {
+					if detail.SystemErr == test.SystemErr {
+						existing.Details[i].Count = detail.Count + 1
+						return existing.Details
 					}
-					return TestDetail{
-						Count:     1,
-						Error:     test.Error,
-						SystemOut: test.SystemOut,
-						SystemErr: test.SystemErr,
-					}
-				}(),
-			},
+				}
+				return append(existing.Details, TestDetail{
+					Count:     1,
+					Error:     test.Error,
+					SystemOut: test.SystemOut,
+					SystemErr: test.SystemErr,
+				})
+			}(),
 		}
 	}
 }
