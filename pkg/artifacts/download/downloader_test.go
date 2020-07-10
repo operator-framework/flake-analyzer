@@ -2,9 +2,8 @@ package download
 
 import (
 	"context"
-	"testing"
-
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 const (
@@ -15,7 +14,7 @@ const (
 func TestListAllArtifacts(t *testing.T) {
 	ctx := context.Background()
 
-	client := NewArtifactClient(ctx, "", owner, repo)
+	client := NewRepositoryClient(ctx, "", owner, repo)
 	list, err := client.ListAllArtifacts(ctx)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, list)
