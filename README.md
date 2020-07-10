@@ -2,8 +2,8 @@
 
 This Flak Analyzer is a project to summerize JUNIT test reports generated from GitHub workflow where the  results are
  uploaded to the repository at the end of every (failed) run. The analyzer generates reports by aggregating all the
-  results availble and sort the failed tests by their occurrence from highest to lowest. This analyzer is a
-   standalone project that can be used as part of the workflow to download test results from GitHub as artifacts and
+  results availble and sort the failed tests by their occurrences from high to low. This analyzer is a
+   standalone project that can be used as a part of the workflow to download test results from GitHub as artifacts and
     aggregate them.
     
 To use this project, you need to set up the following:
