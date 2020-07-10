@@ -3,8 +3,11 @@ package loader
 import (
 	"context"
 	"fmt"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
+	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/joshdk/go-junit"
@@ -14,32 +17,32 @@ import (
 )
 
 type FlakReport struct {
-	filter         reportFilter
-	TotalCount     int         // All imported test reports have failures
-	FlakTestCount  int         // Number of test suit report
-	FlakTests      []TestEntry // Sorted by counts and number of commits
-	SkippedTests   []TestEntry
-	flakTestMap    testMap // map[class name + test name]TestEntry
-	skippedTestMap testMap
+	filter           reportFilter
+	TotalCount       int         `json:"total_test_count"`   // All imported test reports have failures
+	FlakTestCount    int         `json:"flak_test_count"`    // Number of test suit report
+	SkippedTestCount int         `json:"skipped_test_count"` // Number of test suit report
+	FlakTests        []TestEntry `json:"flak_tests"`         // Sorted by counts and number of commits
+	SkippedTests     []TestEntry `json:"skipped_tests"`
+	flakTestMap      testMap     // map[class name + test name]TestEntry
+	skippedTestMap   testMap
 }
 
 type testMap map[string]TestEntry
 
 type TestEntry struct {
-	Commits         []string
-	Counts          int
-	Name            string
-	ClassName       string
-	MeanDurationSec float64
-	Details         []TestDetail
+	ClassName       string       `json:"class_name"`
+	Name            string       `json:"name"`
+	Counts          int          `json:"counts"`
+	Details         []TestDetail `json:"details"`
+	Commits         []string     `json:"commits"`
+	MeanDurationSec float64      `json:"mean_duration_sec"`
 }
 
 type TestDetail struct {
-	Count     int
-	Reason    string
-	Error     error
-	SystemOut string
-	SystemErr string
+	Count     int    `json:"count"`
+	Error     error  `json:"error"`
+	SystemOut string `json:"system_out"`
+	SystemErr string `json:"system_err"`
 }
 
 type reportFilter struct {
@@ -66,14 +69,9 @@ func FilterTo(to time.Time) filterOption {
 	}
 }
 
-func RepoOwner(owner string) filterOption {
+func RepositoryInfo(owner, name string) filterOption {
 	return func(filter *reportFilter) {
 		filter.owner = owner
-	}
-}
-
-func RepoName(name string) filterOption {
-	return func(filter *reportFilter) {
 		filter.repo = name
 	}
 }
@@ -131,7 +129,7 @@ func (r *reportFilter) complete() error {
 	return nil
 }
 
-func NewFlakReport() (*FlakReport, error) {
+func NewFlakReport() *FlakReport {
 	return &FlakReport{
 		filter:         reportFilter{},
 		TotalCount:     0,
@@ -140,7 +138,7 @@ func NewFlakReport() (*FlakReport, error) {
 		SkippedTests:   []TestEntry{},
 		flakTestMap:    map[string]TestEntry{},
 		skippedTestMap: map[string]TestEntry{},
-	}, nil
+	}
 }
 
 func (f *FlakReport) LoadReport(option ...filterOption) error {
@@ -163,9 +161,9 @@ func (f *FlakReport) LoadReport(option ...filterOption) error {
 		if err != nil {
 			return err
 		}
-		parttern := "*" + f.filter.testsuite + "-" + f.filter.commit + "*"
-		d, err := client.DownloadArtifacts(ctx, arlist, tmpDir, parttern,
-			f.filter.from, f.filter.to)
+
+		parttern := f.filter.testsuite + "-" + f.filter.commit
+		d, err := client.DownloadArtifacts(ctx, arlist, tmpDir, parttern, f.filter.from, f.filter.to)
 		if d == nil {
 			return fmt.Errorf("no artifact has been downlaoded")
 		}
@@ -189,8 +187,42 @@ func (f *FlakReport) LoadReport(option ...filterOption) error {
 }
 
 // GenerateReport sorts the report and converts the tests from map to arrays for print out. It generates a yaml report.
-func (f *FlakReport) GenerateReport()error{
+func (f *FlakReport) GenerateReport(outputFile string) ([]byte, error) {
+	for _, test := range f.flakTestMap {
+		f.FlakTests = append(f.FlakTests, test)
+	}
 
+	for _, test := range f.skippedTestMap {
+		f.SkippedTests = append(f.SkippedTests, test)
+	}
+
+	f.FlakTestCount = len(f.FlakTests)
+
+	sort.Slice(f.FlakTests, func(i, j int) bool {
+		return f.FlakTests[i].Counts > f.FlakTests[j].Counts && len(f.FlakTests[i].Commits) > len(f.FlakTests[j].Commits)
+	})
+
+	f.SkippedTestCount = len(f.SkippedTests)
+
+	sort.Slice(f.SkippedTests, func(i, j int) bool {
+		return f.SkippedTests[i].Counts > f.SkippedTests[j].Counts && len(f.SkippedTests[i].Commits) > len(f.SkippedTests[j].Commits)
+	})
+
+	data, err := yaml.Marshal(f)
+	if err != nil {
+		return nil, err
+	}
+
+	if outputFile != "" {
+		if err := os.MkdirAll(filepath.Dir(outputFile), 0700); err != nil {
+			return nil, err
+		}
+		if err := ioutil.WriteFile(outputFile, data, 0644); err != nil {
+			return nil, err
+		}
+	}
+
+	return data, nil
 }
 
 func (f *FlakReport) addTests(dir string) error {
@@ -242,19 +274,28 @@ func (t *testMap) loadTestEntries(test junit.Test, commit string) {
 			},
 		}
 	} else {
+
 		(*t)[testName] = TestEntry{
-			Commits:         []string{commit},
+			Commits:         append(existing.Commits, commit),
 			Counts:          existing.Counts + 1,
 			Name:            test.Name,
 			ClassName:       test.Classname,
 			MeanDurationSec: (test.Duration.Seconds()-existing.MeanDurationSec)/float64(existing.Counts+1) + existing.MeanDurationSec,
 			Details: []TestDetail{
-				{
-					Count:     1,
-					Error:     test.Error,
-					SystemOut: test.SystemOut,
-					SystemErr: test.SystemErr,
-				},
+				func() TestDetail {
+					for _, detail := range existing.Details {
+						if detail.SystemErr == test.SystemErr && detail.SystemOut == test.SystemOut && detail.Error == test.Error {
+							detail.Count = detail.Count + 1
+							return detail
+						}
+					}
+					return TestDetail{
+						Count:     1,
+						Error:     test.Error,
+						SystemOut: test.SystemOut,
+						SystemErr: test.SystemErr,
+					}
+				}(),
 			},
 		}
 	}
