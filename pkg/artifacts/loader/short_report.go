@@ -1,6 +1,8 @@
 package loader
 
-import "gopkg.in/yaml.v2"
+import (
+	"gopkg.in/yaml.v2"
+)
 
 type ShortFlakReport struct {
 	TotalTestCount   int              `json:"total_test_count"`     // All imported test reports have failures

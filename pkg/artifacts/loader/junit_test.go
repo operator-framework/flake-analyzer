@@ -33,7 +33,7 @@ func TestNewFlakReport(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, data)
 
-	data, err =report.GenerateShortReport()
+	data, err = report.GenerateShortReport()
 	assert.NoError(t, err)
 	assert.NotEmpty(t, data)
 }
@@ -46,4 +46,7 @@ func TestGeneratingFlakReportFromOnline(t *testing.T) {
 	data, err := report.GenerateReport("./online/report.yaml")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, data)
+
+	_, err = report.GenerateShortReport()
+	assert.NoError(t, err)
 }
