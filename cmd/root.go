@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	"os"
@@ -10,52 +10,52 @@ import (
 	"github.com/bowenislandsong/flak-analyzer/pkg/artifacts/loader"
 )
 
-func main() {
-	rootCmd := &cobra.Command{
-		Use:   "flake-analyzer",
-		Short: "Flake analyzer",
-		Long: "The flake analyzer downloads JUNIT test report from GITHUB as artifacts and generate report to upload as" +
-			" artifacts. It also creates comments for the PR initiating the tests to list out failures",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			owner := cmd.Flag("owner").Value.String()
-			repo := cmd.Flag("repo").Value.String()
-			token := cmd.Flag("token").Value.String()
+var rootCmd = &cobra.Command{
+	Use:   "flake-analyzer",
+	Short: "Flake analyzer",
+	Long: "The flake analyzer downloads JUNIT test report from GITHUB as artifacts and generate report to upload as" +
+		" artifacts. It also creates comments for the PR initiating the tests to list out failures",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		owner := cmd.Flag("owner").Value.String()
+		repo := cmd.Flag("repo").Value.String()
+		token := cmd.Flag("token").Value.String()
 
-			fromDays := cmd.Flag("from-days-ago").Value.String()
-			fdays, err := strconv.Atoi(fromDays)
-			if err != nil {
-				return err
-			}
-			toDays := cmd.Flag("to-days-ago").Value.String()
-			tdays, err := strconv.Atoi(toDays)
-			if err != nil {
-				return err
-			}
-
-			nameFilter := cmd.Flag("test-suite-filter").Value.String()
-			commitFilter := cmd.Flag("commit").Value.String()
-			reportDir := cmd.Flag("report-dir").Value.String()
-			ArtifactDir := cmd.Flag("download-dir").Value.String()
-
-			report := loader.NewFlakReport()
-
-			if err := report.LoadReport(loader.RepositoryInfo(owner, repo), loader.WithToken(token),
-				loader.FilterFromDaysAgo(fdays), loader.FilterToDaysAgo(tdays),
-				loader.FilterTestSuite(nameFilter), loader.FilterCommit(commitFilter),
-				loader.WithTempDownloadDir(ArtifactDir)); err != nil {
-				return err
-			}
-
-			if _, err := report.GenerateReport(reportDir); err != nil {
-				return err
-			}
-
-			_, err = report.GenerateShortReport()
-
+		fromDays := cmd.Flag("from-days-ago").Value.String()
+		fdays, err := strconv.Atoi(fromDays)
+		if err != nil {
 			return err
-		},
-	}
+		}
+		toDays := cmd.Flag("to-days-ago").Value.String()
+		tdays, err := strconv.Atoi(toDays)
+		if err != nil {
+			return err
+		}
 
+		nameFilter := cmd.Flag("test-suite-filter").Value.String()
+		commitFilter := cmd.Flag("commit").Value.String()
+		reportDir := cmd.Flag("report-dir").Value.String()
+		ArtifactDir := cmd.Flag("download-dir").Value.String()
+
+		report := loader.NewFlakReport()
+
+		if err := report.LoadReport(loader.RepositoryInfo(owner, repo), loader.WithToken(token),
+			loader.FilterFromDaysAgo(fdays), loader.FilterToDaysAgo(tdays),
+			loader.FilterTestSuite(nameFilter), loader.FilterCommit(commitFilter),
+			loader.WithTempDownloadDir(ArtifactDir)); err != nil {
+			return err
+		}
+
+		if _, err := report.GenerateReport(reportDir); err != nil {
+			return err
+		}
+
+		_, err = report.GenerateShortReport()
+
+		return err
+	},
+}
+
+func main() {
 	rootCmd.Flags().StringP("owner", "n", "", "The owner of the repository to analyze the flakes.")
 	if err := rootCmd.MarkFlagRequired("owner"); err != nil {
 		log.Fatalf("Failed to mark `owner` flag for `flake-analyzer` subcommand as required")
