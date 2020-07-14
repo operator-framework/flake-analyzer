@@ -27,6 +27,14 @@ type ShortTestDetail struct {
 
 func (f *FlakReport) GenerateShortReport() ([]byte, error) {
 	var shortFlaksTests, shortSkippedTests []ShortTestEntry
+
+	if f.FlakTests == nil && f.SkippedTests == nil {
+		if _, err := f.GenerateReport(""); err != nil {
+			return nil, err
+		}
+
+	}
+
 	for _, test := range f.FlakTests {
 		shortFlaksTests = append(shortFlaksTests, ShortTestEntry{
 			ClassName: test.ClassName,

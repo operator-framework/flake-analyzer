@@ -63,11 +63,26 @@ func FilterFrom(from time.Time) filterOption {
 	}
 }
 
-func FilterTo(to time.Time) filterOption {
+func FilterFromDaysAgo(days int) filterOption {
+	from := time.Now().AddDate(0,0,-days)
 	return func(filter *reportFilter) {
-		filter.from = &to
+		filter.from = &from
 	}
 }
+
+func FilterTo(to time.Time) filterOption {
+	return func(filter *reportFilter) {
+		filter.to = &to
+	}
+}
+
+func FilterToDaysAgo(days int) filterOption {
+	to := time.Now().AddDate(0,0,-days)
+	return func(filter *reportFilter) {
+		filter.to = &to
+	}
+}
+
 
 func RepositoryInfo(owner, name string) filterOption {
 	return func(filter *reportFilter) {
@@ -101,9 +116,9 @@ func ImportFromLocalDirectory(dir string) filterOption {
 }
 
 // WithTempDownloadDir specify the directory where artifacts will be temprarily downloaded for use.
-func WithTempDownloadDir(dir string) filterOption {
+func WithTempDownloadDir(tmpDir string) filterOption {
 	return func(filter *reportFilter) {
-		filter.tmpDir = dir
+		filter.tmpDir = tmpDir
 	}
 }
 
