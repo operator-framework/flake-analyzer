@@ -1,6 +1,6 @@
-# flak-analyzer
+# Flake-Analyzer
 
-This Flak Analyzer is a project to summerize JUNIT test reports generated from GitHub workflow where the  results are
+This Flake Analyzer is a project to summerize JUNIT test reports generated from GitHub workflow where the  results are
  uploaded to the repository at the end of every (failed) run. The analyzer generates reports by aggregating all the
   results availble and sort the failed tests by their occurrences from high to low. This analyzer is a
    standalone project that can be used as a part of the workflow to download test results from GitHub as artifacts and
@@ -42,9 +42,9 @@ jobs:
 ## Analysis Report Example
 ```yaml
 totaltestcount: 30
-flaktestcount: 43
+flaketestcount: 43
 skippedtestcount: 4
-flaktests:
+flaketests:
 - classname: End-to-end
   name: Installing bundles with new object types when a bundle with a pdb, priorityclass,
     and VPA object is installed should create the additional bundle objects

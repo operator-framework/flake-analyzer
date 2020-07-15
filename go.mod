@@ -1,4 +1,4 @@
-module github.com/bowenislandsong/flak-analyzer
+module github.com/operator-framework/flak-analyzer
 
 go 1.13
 

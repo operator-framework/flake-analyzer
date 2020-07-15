@@ -16,18 +16,18 @@ import (
 	"github.com/joshdk/go-junit"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/bowenislandsong/flak-analyzer/pkg/github"
 	gh "github.com/google/go-github/v32/github"
+	"github.com/operator-framework/flak-analyzer/pkg/github"
 )
 
-type FlakReport struct {
+type FlakeReport struct {
 	filter           reportFilter
-	TotalTestCount   int         `json:"total_test_count"`     // All imported test reports have failures
-	FlakTestCount    int         `json:"flak_test_count"`      // Number of test suit report
-	SkippedTestCount int         `json:"skipped_test_count"`   // Number of test suit report
-	FlakTests        []TestEntry `json:"flak_tests",omitempty` // Sorted by counts and number of commits
+	TotalTestCount   int         `json:"total_test_count"`      // All imported test reports have failures
+	FlakeTestCount   int         `json:"flake_test_count"`      // Number of test suit report
+	SkippedTestCount int         `json:"skipped_test_count"`    // Number of test suit report
+	FlakeTests       []TestEntry `json:"flake_tests",omitempty` // Sorted by counts and number of commits
 	SkippedTests     []TestEntry `json:"skipped_tests",omitempty`
-	flakTestMap      testMap     // map[class name + test name]TestEntry
+	flakeTestMap     testMap     // map[class name + test name]TestEntry
 	skippedTestMap   testMap
 }
 
@@ -161,19 +161,19 @@ func (r *reportFilter) complete() error {
 	return nil
 }
 
-func NewFlakReport() *FlakReport {
-	return &FlakReport{
+func NewFlakeReport() *FlakeReport {
+	return &FlakeReport{
 		filter:         reportFilter{},
 		TotalTestCount: 0,
-		FlakTestCount:  0,
-		FlakTests:      []TestEntry{},
+		FlakeTestCount: 0,
+		FlakeTests:     []TestEntry{},
 		SkippedTests:   []TestEntry{},
-		flakTestMap:    map[string]TestEntry{},
+		flakeTestMap:   map[string]TestEntry{},
 		skippedTestMap: map[string]TestEntry{},
 	}
 }
 
-func (f *FlakReport) LoadReport(option ...filterOption) error {
+func (f *FlakeReport) LoadReport(option ...filterOption) error {
 	f.filter.apply(option)
 	if err := f.filter.complete(); err != nil {
 		return err
@@ -261,19 +261,19 @@ func (f *FlakReport) LoadReport(option ...filterOption) error {
 }
 
 // GenerateReport sorts the report and converts the tests from map to arrays for print out. It generates a yaml report.
-func (f *FlakReport) GenerateReport(outputFile string) ([]byte, error) {
-	for _, test := range f.flakTestMap {
-		f.FlakTests = append(f.FlakTests, test)
+func (f *FlakeReport) GenerateReport(outputFile string) ([]byte, error) {
+	for _, test := range f.flakeTestMap {
+		f.FlakeTests = append(f.FlakeTests, test)
 	}
 
 	for _, test := range f.skippedTestMap {
 		f.SkippedTests = append(f.SkippedTests, test)
 	}
 
-	f.FlakTestCount = len(f.FlakTests)
+	f.FlakeTestCount = len(f.FlakeTests)
 
-	sort.Slice(f.FlakTests, func(i, j int) bool {
-		return f.FlakTests[i].Counts > f.FlakTests[j].Counts && len(f.FlakTests[i].Commits) > len(f.FlakTests[j].Commits)
+	sort.Slice(f.FlakeTests, func(i, j int) bool {
+		return f.FlakeTests[i].Counts > f.FlakeTests[j].Counts && len(f.FlakeTests[i].Commits) > len(f.FlakeTests[j].Commits)
 	})
 
 	f.SkippedTestCount = len(f.SkippedTests)
@@ -300,7 +300,7 @@ func (f *FlakReport) GenerateReport(outputFile string) ([]byte, error) {
 	return data, nil
 }
 
-func (f *FlakReport) addTests(dir string) error {
+func (f *FlakeReport) addTests(dir string) error {
 	artifacts, err := LoadZippedArtifactsFromDirectory(dir)
 	if err != nil {
 		return err
@@ -320,7 +320,7 @@ func (f *FlakReport) addTests(dir string) error {
 					f.skippedTestMap.loadTestEntries(t, ar.commit)
 				default:
 					// failed or errored
-					f.flakTestMap.loadTestEntries(t, ar.commit)
+					f.flakeTestMap.loadTestEntries(t, ar.commit)
 				}
 			}
 		}

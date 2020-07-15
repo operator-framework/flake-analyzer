@@ -3,16 +3,17 @@ package loader
 import (
 	"context"
 	"fmt"
-	"github.com/bowenislandsong/flak-analyzer/pkg/github"
 	"gopkg.in/yaml.v3"
 	"strconv"
+
+	"github.com/operator-framework/flak-analyzer/pkg/github"
 )
 
-type HtmlFlakReport struct {
+type HtmlFlakeReport struct {
 	TotalTestCount   int             `json:"total_test_count",omitempty`   // All imported test reports have failures
-	FlakTestCount    int             `json:"flak_test_count",omitempty`    // Number of test suit report
+	FlakeTestCount   int             `json:"flake_test_count",omitempty`   // Number of test suit report
 	SkippedTestCount int             `json:"skipped_test_count",omitempty` // Number of test suit report
-	FlakTests        []HtmlTestEntry `json:"flak_tests",omitempty`         // Sorted by counts and number of commits
+	FlakeTests       []HtmlTestEntry `json:"flake_tests",omitempty`        // Sorted by counts and number of commits
 	SkippedTests     []HtmlTestEntry `json:"skipped_tests",omitempty`
 }
 
@@ -29,8 +30,8 @@ type HtmlTestDetail struct {
 	Error string `json:"error",omitempty`
 }
 
-func (f *FlakReport) PostReportAsPullRequestComment(option ...filterOption) (*string, error) {
-	if f.FlakTests == nil && f.SkippedTests == nil {
+func (f *FlakeReport) PostReportAsPullRequestComment(option ...filterOption) (*string, error) {
+	if f.FlakeTests == nil && f.SkippedTests == nil {
 		if _, err := f.GenerateReport(""); err != nil {
 			return nil, err
 		}
@@ -56,11 +57,11 @@ func (f *FlakReport) PostReportAsPullRequestComment(option ...filterOption) (*st
 	return report, err
 }
 
-func (f *FlakReport) generateReportComment() (*string, error) {
-	var shortFlaksTests, shortSkippedTests []HtmlTestEntry
+func (f *FlakeReport) generateReportComment() (*string, error) {
+	var shortFlakeTests, shortSkippedTests []HtmlTestEntry
 
-	for _, test := range f.FlakTests {
-		shortFlaksTests = append(shortFlaksTests, HtmlTestEntry{
+	for _, test := range f.FlakeTests {
+		shortFlakeTests = append(shortFlakeTests, HtmlTestEntry{
 			ClassName: test.ClassName,
 			Name:      test.Name,
 			Counts:    test.Counts,
@@ -95,11 +96,11 @@ func (f *FlakReport) generateReportComment() (*string, error) {
 		})
 	}
 
-	data, err := yaml.Marshal(HtmlFlakReport{
+	data, err := yaml.Marshal(HtmlFlakeReport{
 		TotalTestCount:   f.TotalTestCount,
-		FlakTestCount:    f.FlakTestCount,
+		FlakeTestCount:   f.FlakeTestCount,
 		SkippedTestCount: f.SkippedTestCount,
-		FlakTests:        shortFlaksTests,
+		FlakeTests:       shortFlakeTests,
 		SkippedTests:     shortSkippedTests,
 	})
 	if err != nil {
@@ -108,6 +109,6 @@ func (f *FlakReport) generateReportComment() (*string, error) {
 
 	report := fmt.Sprintf("The PR **failed tests for %d times** with %d individual failed tests and %d skipped tests."+
 		"\n<details>\n\n %v",
-		f.TotalTestCount, f.FlakTestCount, f.SkippedTestCount, string(data))
+		f.TotalTestCount, f.FlakeTestCount, f.SkippedTestCount, string(data))
 	return &report, nil
 }

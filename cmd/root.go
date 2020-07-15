@@ -7,7 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/bowenislandsong/flak-analyzer/pkg/artifacts/loader"
+	"github.com/operator-framework/flak-analyzer/pkg/artifacts/loader"
 )
 
 var rootCmd = &cobra.Command{
@@ -43,7 +43,7 @@ var rootCmd = &cobra.Command{
 			return err
 		}
 
-		report := loader.NewFlakReport()
+		report := loader.NewFlakeReport()
 
 		if err := report.LoadReport(loader.RepositoryInfo(owner, repo), loader.WithToken(token),
 			loader.FilterFromDaysAgo(fdays), loader.FilterToDaysAgo(tdays),

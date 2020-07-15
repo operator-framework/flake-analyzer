@@ -24,8 +24,8 @@ func TestIngestTestSuitesFromRawData(t *testing.T) {
 	}
 }
 
-func TestGeneratingNewFlakReport(t *testing.T) {
-	report := NewFlakReport()
+func TestGeneratingNewFlakeReport(t *testing.T) {
+	report := NewFlakeReport()
 	err := report.LoadReport(ImportFromLocalDirectory("./testData/zip/"))
 	assert.NoError(t, err)
 
@@ -34,8 +34,8 @@ func TestGeneratingNewFlakReport(t *testing.T) {
 	assert.NotEmpty(t, data)
 }
 
-func TestGeneratingFlakReportFromOnline(t *testing.T) {
-	report := NewFlakReport()
+func TestGeneratingFlakeReportFromOnline(t *testing.T) {
+	report := NewFlakeReport()
 	err := report.LoadReport(RepositoryInfo(owner, repo),WithToken(""),FilterFromDaysAgo(3),
 		FilterCommit("08c4c923c66c9d78895847c5b7e1a21c8887d89c|f5f69155b5c13b94ec56c42dc5e2ffc4236f543b"))
 	assert.NoError(t, err)
