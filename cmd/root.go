@@ -20,12 +20,12 @@ var rootCmd = &cobra.Command{
 		repo := cmd.Flag("repo").Value.String()
 		token := cmd.Flag("token").Value.String()
 
-		fromDays := cmd.Flag("from-days-ago").Value.String()
+		fromDays := cmd.Flag("from").Value.String()
 		fdays, err := strconv.Atoi(fromDays)
 		if err != nil {
 			return err
 		}
-		toDays := cmd.Flag("to-days-ago").Value.String()
+		toDays := cmd.Flag("to").Value.String()
 		tdays, err := strconv.Atoi(toDays)
 		if err != nil {
 			return err
@@ -36,12 +36,20 @@ var rootCmd = &cobra.Command{
 		reportDir := cmd.Flag("report-dir").Value.String()
 		ArtifactDir := cmd.Flag("download-dir").Value.String()
 
+		PRnum := cmd.Flag("pull-request").Value.String()
+		waitForQuotaReset := cmd.Flag("wait-for-quota-reset").Value.String()
+		waitForReset, err := strconv.ParseBool(waitForQuotaReset)
+		if err != nil {
+			return err
+		}
+
 		report := loader.NewFlakReport()
 
 		if err := report.LoadReport(loader.RepositoryInfo(owner, repo), loader.WithToken(token),
 			loader.FilterFromDaysAgo(fdays), loader.FilterToDaysAgo(tdays),
 			loader.FilterTestSuite(nameFilter), loader.FilterCommit(commitFilter),
-			loader.WithTempDownloadDir(ArtifactDir)); err != nil {
+			loader.WithTempDownloadDir(ArtifactDir), loader.WaitWaitForQuotaReset(waitForReset),
+			loader.FilterPR(PRnum)); err != nil {
 			return err
 		}
 
@@ -49,9 +57,13 @@ var rootCmd = &cobra.Command{
 			return err
 		}
 
-		_, err = report.GenerateShortReport()
-
-		return err
+		if PRnum != "" {
+			_, err := report.PostReportAsPullRequestComment()
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	},
 }
 
@@ -71,8 +83,8 @@ func main() {
 		log.Fatalf("Failed to mark `token` flag for `flake-analyzer` subcommand as required")
 	}
 
-	rootCmd.Flags().Uint("from-days-ago", 90, "Include test results created as artifacts from the number of days ago")
-	rootCmd.Flags().Uint("to-days-ago", 0, "Include test results created as artifacts until the number of days ago")
+	rootCmd.Flags().Uint("from", 90, "Include test results created as artifacts from a number of days ago")
+	rootCmd.Flags().Uint("to", 0, "Include test results created as artifacts until a number of days ago")
 
 	rootCmd.Flags().StringP("test-suite-filter", "f", "",
 		"Filter test by the test suite name or the common names between the artifacts.")
@@ -80,7 +92,10 @@ func main() {
 		"Filter test by the commit SHA or the common names between the artifacts")
 
 	rootCmd.Flags().StringP("report-dir", "o", "./report", "The directory to save the generated report.")
-	rootCmd.Flags().StringP("download-dir", "d", "./tmp", "The directory to save the downloaded artifacts.")
+	rootCmd.Flags().StringP("download-dir", "d", "", "The directory to save the downloaded artifacts.")
+
+	rootCmd.Flags().StringP("pull-request", "p", "", "Generate a report for a Pull Request and post as comment.")
+	rootCmd.Flags().BoolP("wait-for-quota-reset", "w", false, "Wait for GitHub to reset token limit if quota runs out.")
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

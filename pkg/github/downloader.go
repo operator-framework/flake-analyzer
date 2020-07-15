@@ -1,8 +1,9 @@
-package download
+package github
 
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -12,47 +13,32 @@ import (
 	"time"
 
 	"github.com/google/go-github/v32/github"
-	"golang.org/x/oauth2"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
-type repositoryClient struct {
-	*github.Client
-	Owner string
-	Repo  string
-}
-
-func NewRepositoryClient(ctx context.Context, accessToken, owner, repo string) *repositoryClient {
-	if accessToken == "" {
-		return &repositoryClient{
-			Client: github.NewClient(nil),
-			Owner:  owner,
-			Repo:   repo,
+func (r *RepositoryClient) ListAllArtifacts(ctx context.Context) ([]*github.Artifact, error) {
+	var artifactList []*github.Artifact
+	done := false
+	page := 0
+	for !done {
+		list, resp, err := r.Actions.ListArtifacts(ctx, r.Owner, r.Repo, &github.ListOptions{Page: page, PerPage: 1000})
+		if err != nil {
+			return nil, err
 		}
+		if 0 == resp.NextPage || resp.Rate.Remaining <= len(artifactList)+2 {
+			done = true
+		}
+		page = resp.NextPage
+		artifactList = append(artifactList, list.Artifacts...)
 	}
-
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: accessToken},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-
-	return &repositoryClient{
-		Client: github.NewClient(tc),
-		Owner:  owner,
-		Repo:   repo,
-	}
-}
-
-func (r *repositoryClient) ListAllArtifacts(ctx context.Context) (list *github.ArtifactList, err error) {
-	list, _, err = r.Actions.ListArtifacts(ctx, r.Owner, r.Repo, &github.ListOptions{})
-	return
+	return artifactList, nil
 }
 
 // DownloadArtifacts tries to download artifacts from a artifact list to a directory based on name and time filtering.
 // The client is required to have authentication.
 // The function returns a list of successfully downloaded artifacts and error.
 // Github API related errors are aggrgated and do not stop its following operations due to possible throttling.
-func (r *repositoryClient) DownloadArtifacts(ctx context.Context, artifactList *github.ArtifactList, dir,
+func (r *RepositoryClient) DownloadArtifacts(ctx context.Context, artifactList []*github.Artifact, dir,
 	namePattern string, after, before *time.Time) ([]string, error) {
 
 	if _, err := ioutil.ReadDir(dir); err != nil {
@@ -64,7 +50,7 @@ func (r *repositoryClient) DownloadArtifacts(ctx context.Context, artifactList *
 	var errs []error
 	var artifacts []string
 
-	for _, l := range artifactList.Artifacts {
+	for _, l := range artifactList {
 		// Artifacts expires after 90 days.
 		if l.GetExpired() {
 			continue
@@ -100,10 +86,14 @@ func (r *repositoryClient) DownloadArtifacts(ctx context.Context, artifactList *
 	return artifacts, utilerrors.NewAggregate(errs)
 }
 
-func (r *repositoryClient) downloadArtifact(ctx context.Context, artifactID int64, name, dir string) error {
-	url, _, err := r.Actions.DownloadArtifact(ctx, r.Owner, r.Repo, artifactID, false)
+func (r *RepositoryClient) downloadArtifact(ctx context.Context, artifactID int64, name, dir string) error {
+	url, res, err := r.Actions.DownloadArtifact(ctx, r.Owner, r.Repo, artifactID, false)
 	if err != nil {
 		return err
+	}
+
+	if r.WaitForQuotaReset {
+		waitForQuota(res)
 	}
 
 	resp, err := http.Get(url.String())
@@ -120,4 +110,13 @@ func (r *repositoryClient) downloadArtifact(ctx context.Context, artifactID int6
 	// Write the body to file
 	_, err = io.Copy(out, resp.Body)
 	return err
+}
+
+func waitForQuota(response *github.Response) {
+	if response.Rate.Remaining == 0 {
+		logrus.Infof("Waiting for GitHub quota reset: %s",response.Rate.String())
+		time.Sleep(response.Rate.Reset.Sub(time.Now()))
+		// Waiting for an extra 5 seconds.
+		time.Sleep(5 * time.Second)
+	}
 }

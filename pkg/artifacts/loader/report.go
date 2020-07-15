@@ -3,17 +3,21 @@ package loader
 import (
 	"context"
 	"fmt"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/joshdk/go-junit"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/bowenislandsong/flak-analyzer/pkg/artifacts/download"
+	"github.com/bowenislandsong/flak-analyzer/pkg/github"
+	gh "github.com/google/go-github/v32/github"
 )
 
 type FlakReport struct {
@@ -46,13 +50,15 @@ type TestDetail struct {
 }
 
 type reportFilter struct {
-	from, to    *time.Time
-	owner, repo string
-	token       string
-	testsuite   string
-	commit      string
-	localPath   string
-	tmpDir      string
+	from, to          *time.Time
+	owner, repo       string
+	token             string
+	testsuite         string
+	commit            string
+	pullRequest       string
+	localPath         string
+	tmpDir            string
+	waitForQuotaReset bool
 }
 
 type filterOption func(filter *reportFilter)
@@ -64,7 +70,7 @@ func FilterFrom(from time.Time) filterOption {
 }
 
 func FilterFromDaysAgo(days int) filterOption {
-	from := time.Now().AddDate(0,0,-days)
+	from := time.Now().AddDate(0, 0, -days)
 	return func(filter *reportFilter) {
 		filter.from = &from
 	}
@@ -77,12 +83,17 @@ func FilterTo(to time.Time) filterOption {
 }
 
 func FilterToDaysAgo(days int) filterOption {
-	to := time.Now().AddDate(0,0,-days)
+	to := time.Now().AddDate(0, 0, -days)
 	return func(filter *reportFilter) {
 		filter.to = &to
 	}
 }
 
+func WaitWaitForQuotaReset(waitForReset bool) filterOption {
+	return func(filter *reportFilter) {
+		filter.waitForQuotaReset = waitForReset
+	}
+}
 
 func RepositoryInfo(owner, name string) filterOption {
 	return func(filter *reportFilter) {
@@ -106,6 +117,12 @@ func FilterTestSuite(testsuite string) filterOption {
 func FilterCommit(commit string) filterOption {
 	return func(filter *reportFilter) {
 		filter.commit = commit
+	}
+}
+
+func FilterPR(pr string) filterOption {
+	return func(filter *reportFilter) {
+		filter.pullRequest = pr
 	}
 }
 
@@ -164,32 +181,74 @@ func (f *FlakReport) LoadReport(option ...filterOption) error {
 
 	if f.filter.owner != "" && f.filter.repo != "" {
 		ctx := context.Background()
-		tmpDir, err := ioutil.TempDir(f.filter.tmpDir, "artifacts-")
-		if err != nil {
-			return err
-		}
-		defer os.RemoveAll(tmpDir)
 
 		// Download from Github
-		client := download.NewRepositoryClient(ctx, f.filter.token, f.filter.owner, f.filter.repo)
+		client := github.NewRepositoryClient(ctx, f.filter.token, f.filter.owner, f.filter.repo, f.filter.waitForQuotaReset)
 		arlist, err := client.ListAllArtifacts(ctx)
 		if err != nil {
 			return err
 		}
 
-		parttern := f.filter.testsuite + "-" + f.filter.commit
-		d, err := client.DownloadArtifacts(ctx, arlist, tmpDir, parttern, f.filter.from, f.filter.to)
-		if d == nil {
-			return fmt.Errorf("no artifact has been downlaoded")
+		if f.filter.pullRequest != "" {
+			pr, err := strconv.Atoi(f.filter.pullRequest)
+			if err != nil {
+				return err
+			}
+			commits, err := client.ListCommitsFromPR(ctx, pr)
+			if err != nil {
+				return err
+			}
+			if f.filter.commit != "" {
+				commits = append(commits, f.filter.commit)
+			}
+			f.filter.commit = strings.Join(commits, "|")
 		}
-		log.Infof("Downloaded %d artifacts from %s/%s with filter '%s' from %v to %v", len(d), f.filter.owner,
-			f.filter.repo, parttern, f.filter.from, f.filter.to)
 
-		// Parse it
-		err = f.addTests(tmpDir)
-		if err != nil {
-			return err
+		parttern := f.filter.testsuite + "-" + f.filter.commit
+
+		chErr := make(chan error)
+		var arNames []string
+		var wg sync.WaitGroup
+		var mutex = &sync.Mutex{}
+
+		for index, artifacts := range splitStringSlice(arlist, 8) {
+			wg.Add(1)
+			go func(i int, ar []*gh.Artifact) {
+				defer wg.Done()
+				tmpDir, err := ioutil.TempDir(f.filter.tmpDir, "artifacts-")
+				if err != nil {
+					chErr <- err
+					return
+				}
+				defer os.RemoveAll(tmpDir)
+				d, err := client.DownloadArtifacts(ctx, ar, tmpDir, parttern, f.filter.from, f.filter.to)
+				if err != nil {
+					chErr <- fmt.Errorf("no artifact has been downlaoded %v", err)
+					return
+				}
+				if d == nil {
+					return
+				}
+				mutex.Lock()
+				arNames = append(arNames, d...)
+				// Parse it
+				err = f.addTests(tmpDir)
+				if err != nil {
+					chErr <- err
+					return
+				}
+				mutex.Unlock()
+			}(index, artifacts)
 		}
+		wg.Wait()
+		select {
+		case err := <-chErr:
+			return err
+		default:
+			log.Infof("Downloaded %d artifacts from %s/%s with filter '%s' from %v to %v", len(arNames), f.filter.owner,
+				f.filter.repo, parttern, f.filter.from, f.filter.to)
+		}
+
 	}
 
 	if f.filter.localPath != "" {
@@ -229,6 +288,7 @@ func (f *FlakReport) GenerateReport(outputFile string) ([]byte, error) {
 	}
 
 	if outputFile != "" {
+		log.Infof("Writing report to %s", outputFile)
 		if err := os.MkdirAll(filepath.Dir(outputFile), 0700); err != nil {
 			return nil, err
 		}
@@ -334,4 +394,21 @@ func ingestTestSuitesFromRawData(rawData ...[]byte) ([]junit.Suite, error) {
 	}
 
 	return testSuites, nil
+}
+
+func splitStringSlice(s []*gh.Artifact, n int) (result [][]*gh.Artifact) {
+	if len(s) < n {
+		return append(result, s)
+	}
+	num := len(s) / n
+	for i := 0; i < n; i++ {
+		result = append(result, s[num*i:num*(i+1)])
+	}
+
+	for i := 0; i < len(s)%n; i++ {
+		if result != nil && result[i] != nil {
+			result[i] = append(result[i], s[len(s)-i-1])
+		}
+	}
+	return
 }
