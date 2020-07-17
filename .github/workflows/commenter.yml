@@ -1,13 +1,13 @@
 name: Post Report As Comment On PR
- 
 on: [repository_dispatch]
- 
+check_run:
 jobs:
   post-report-as-pr-comment:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2      
       - name: Comment On PR
+        if: github.event.action == 'comment'
         env:
           PR: ${{github.event.client_payload.pr}}
           OWNER: ${{github.event.client_payload.owner}}
