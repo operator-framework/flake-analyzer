@@ -1,0 +1,17 @@
+name: Post Report As Comment On PR
+ 
+on: [repository_dispatch]
+ 
+jobs:
+  post-report-as-pr-comment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2      
+      - name: Comment On PR
+        env:
+          PR: ${{github.event.client_payload.pr}}
+          OWNER: ${{github.event.client_payload.owner}}
+          REPO: ${{github.event.client_payload.repo}}
+          TEST_SUITE: ${{github.event.client_payload.test_suite}}
+          TOKEN: ${{secrets.GITHUB_TOKEN}}
+        run: make comment-on-pr
