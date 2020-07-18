@@ -9,7 +9,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2      
       - name: Comment On PR
-        if: github.event.action == 'comment'
         env:
           PR: "1645"
           OWNER: operator-framework
