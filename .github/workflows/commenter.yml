@@ -1,18 +1,18 @@
 name: Post Report As Comment On PR
 on:
+  pull_request:
   schedule:
     - cron: '*/5 * * * *'
-check_run:
 jobs:
   post-report-as-pr-comment:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2      
-      - name: Comment On PR
+      - name: Report On PR
         env:
           PR: "1643"
           OWNER: operator-framework
           REPO: operator-lifecycle-manager
-          TEST_SUITE: e2e
-          TOKEN: ${{secrets.GITHUB_TOKEN}}
-        run: make comment-on-pr
+          TEST_SUITE: e2e-test-output
+          TOKEN: ${{secrets.BOWEN_BOT}}
+        run: make report-on-pr
