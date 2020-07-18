@@ -1,7 +1,7 @@
 name: Post Report As Comment On PR
 on:
   schedule:
-    - cron: '*/1 * * * *'
+    - cron: '*/5 * * * *'
 check_run:
 jobs:
   post-report-as-pr-comment:
