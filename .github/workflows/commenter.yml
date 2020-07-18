@@ -1,6 +1,8 @@
 name: Post Report As Comment On PR
-on: [repository_dispatch]
-check_run:
+on:
+  pull_request:
+  schedule:
+    - cron: '*/15 * * * *'
 jobs:
   post-report-as-pr-comment:
     runs-on: ubuntu-latest
@@ -9,9 +11,9 @@ jobs:
       - name: Comment On PR
         if: github.event.action == 'comment'
         env:
-          PR: ${{github.event.client_payload.pr}}
-          OWNER: ${{github.event.client_payload.owner}}
-          REPO: ${{github.event.client_payload.repo}}
-          TEST_SUITE: ${{github.event.client_payload.test_suite}}
-          TOKEN: ${{secrets.GITHUB_TOKEN}}
-        run: make comment-on-pr
+          PR: "1645"
+          OWNER: operator-framework
+          REPO: operator-lifecycle-manager
+          TEST_SUITE: e2e-test-output
+          TOKEN: ${{secrets.BOWEN_BOT}}
+        run: make report-on-pr
