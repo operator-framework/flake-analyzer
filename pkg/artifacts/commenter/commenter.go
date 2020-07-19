@@ -63,6 +63,7 @@ func (f *CommenterFile) AddRepo(owner, repo, token, testNameMatcher string) erro
 	for i, entry := range f.Commented {
 		if entry.Owner == owner && entry.Repo == repo && entry.TestNameMatcher == testNameMatcher {
 			f.Commented[i].client = fgithub.NewRepositoryClient(ctx, token, owner, repo, false)
+			f.Commented[i].token = token
 			return nil
 		}
 	}
@@ -138,10 +139,11 @@ func (f *CommenterFile) getLatestCommenterFile(ctx context.Context) error {
 
 	if commenterArtifacts != nil {
 		if len(commenterArtifacts) > 1 {
-			sort.Slice(&commenterArtifacts, func(i, j int) bool {
+			sort.Slice(commenterArtifacts, func(i, j int) bool {
 				return commenterArtifacts[i].GetCreatedAt().Time.After(commenterArtifacts[j].GetCreatedAt().Time)
 			})
 		}
+
 		for _, ar := range commenterArtifacts {
 			if ar.GetName() != f.artifactName {
 				continue
@@ -161,6 +163,7 @@ func (f *CommenterFile) getLatestCommenterFile(ctx context.Context) error {
 			if err = yaml.Unmarshal(content, f); err != nil {
 				return err
 			}
+			return nil
 		}
 	}
 	return nil
@@ -213,6 +216,7 @@ func (c *Commenter) generatePRComments(ctx context.Context) ([]pullRequest, erro
 	}
 
 	var pullRequests []pullRequest
+	 updatedRunIDs := map[string]struct{}{}
 	for _, pr := range PRs {
 		commitNums, err := c.client.ListCommitsFromPR(ctx, pr.GetNumber())
 		if err != nil {
@@ -221,6 +225,10 @@ func (c *Commenter) generatePRComments(ctx context.Context) ([]pullRequest, erro
 		var runIDs []string
 		for _, cNum := range commitNums {
 			runIDs = append(runIDs, commitRunIDsMap[cNum]...)
+		}
+
+		for _, id := range runIDs {
+			updatedRunIDs[id] = struct{}{}
 		}
 
 		if c.hasAllRunIDs(runIDs) {
@@ -232,11 +240,8 @@ func (c *Commenter) generatePRComments(ctx context.Context) ([]pullRequest, erro
 			commits: commitNums,
 			runID:   runIDs,
 		})
-
-		for _, id := range runIDs {
-			c.RunIDs[id] = struct{}{}
-		}
 	}
+	c.RunIDs = updatedRunIDs
 	return pullRequests, nil
 
 }
