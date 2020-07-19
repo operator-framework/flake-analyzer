@@ -7,7 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/operator-framework/flak-analyzer/pkg/artifacts/loader"
+	"github.com/operator-framework/flak-analyzer/pkg/artifacts/reporter"
 )
 
 var rootCmd = &cobra.Command{
@@ -43,13 +43,13 @@ var rootCmd = &cobra.Command{
 			return err
 		}
 
-		report := loader.NewFlakeReport()
+		report := reporter.NewFlakeReport()
 
-		if err := report.LoadReport(loader.RepositoryInfo(owner, repo), loader.WithToken(token),
-			loader.FilterFromDaysAgo(fdays), loader.FilterToDaysAgo(tdays),
-			loader.FilterTestSuite(nameFilter), loader.FilterCommit(commitFilter),
-			loader.WithTempDownloadDir(ArtifactDir), loader.WaitWaitForQuotaReset(waitForReset),
-			loader.FilterPR(PRnum)); err != nil {
+		if err := report.LoadReport(reporter.RepositoryInfo(owner, repo), reporter.WithToken(token),
+			reporter.FilterFromDaysAgo(fdays), reporter.FilterToDaysAgo(tdays),
+			reporter.FilterTestSuite(nameFilter), reporter.FilterCommit(commitFilter),
+			reporter.WithTempDownloadDir(ArtifactDir), reporter.WaitWaitForQuotaReset(waitForReset),
+			reporter.FilterPR(PRnum)); err != nil {
 			return err
 		}
 

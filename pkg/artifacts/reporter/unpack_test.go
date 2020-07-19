@@ -1,4 +1,4 @@
-package loader
+package reporter
 
 import (
 	"github.com/stretchr/testify/assert"

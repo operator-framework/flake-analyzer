@@ -1,13 +1,17 @@
-package loader
+package reporter
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"strconv"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/operator-framework/flak-analyzer/pkg/github"
 )
+
+var ErrorNothingToReport error = errors.New("no error in test to report")
 
 type HtmlFlakeReport struct {
 	TotalTestCount   int             `json:"total_test_count",omitempty`   // All imported test reports have failures
@@ -31,7 +35,7 @@ type HtmlTestDetail struct {
 }
 
 func (f *FlakeReport) PostReportAsPullRequestComment(option ...filterOption) (*string, error) {
-	if f.FlakeTests == nil && f.SkippedTests == nil {
+	if len(f.FlakeTests) == 0 && len(f.SkippedTests) == 0 {
 		if _, err := f.GenerateReport(""); err != nil {
 			return nil, err
 		}
@@ -44,6 +48,9 @@ func (f *FlakeReport) PostReportAsPullRequestComment(option ...filterOption) (*s
 	report, err := f.generateReportComment()
 	if err != nil {
 		return nil, err
+	}
+	if report == nil {
+		return nil, ErrorNothingToReport
 	}
 
 	ctx := context.Background()
@@ -63,7 +70,7 @@ func (f *FlakeReport) generateReportComment() (*string, error) {
 	for _, test := range f.FlakeTests {
 		shortFlakeTests = append(shortFlakeTests, HtmlTestEntry{
 			ClassName: test.ClassName,
-			Name:      test.Name,
+			Name:      "**" + test.Name + "**",
 			Counts:    test.Counts,
 			Details: func() (details []HtmlTestDetail) {
 				for _, d := range test.Details {
@@ -81,7 +88,7 @@ func (f *FlakeReport) generateReportComment() (*string, error) {
 	for _, test := range f.SkippedTests {
 		shortSkippedTests = append(shortSkippedTests, HtmlTestEntry{
 			ClassName: test.ClassName,
-			Name:      test.Name,
+			Name:      "**" + test.Name + "**",
 			Counts:    test.Counts,
 			Details: func() (details []HtmlTestDetail) {
 				for _, d := range test.Details {
@@ -96,6 +103,10 @@ func (f *FlakeReport) generateReportComment() (*string, error) {
 		})
 	}
 
+	if shortFlakeTests == nil && shortSkippedTests == nil {
+		return nil, ErrorNothingToReport
+	}
+
 	data, err := yaml.Marshal(HtmlFlakeReport{
 		TotalTestCount:   f.TotalTestCount,
 		FlakeTestCount:   f.FlakeTestCount,
@@ -107,8 +118,8 @@ func (f *FlakeReport) generateReportComment() (*string, error) {
 		return nil, err
 	}
 
-	report := fmt.Sprintf("The PR **failed tests for %d times** with %d individual failed tests and %d skipped tests."+
-		"\n<details>\n\n %v",
+	report := fmt.Sprintf("This PR **failed tests for %d times** with %d individual failed tests and %d skipped tests."+
+		" A test is considered flaky if failed on multiple commits. \n<details>\n\n %v",
 		f.TotalTestCount, f.FlakeTestCount, f.SkippedTestCount, string(data))
 	return &report, nil
 }
