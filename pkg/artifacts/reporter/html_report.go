@@ -1,10 +1,14 @@
 package reporter
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/operator-framework/flak-analyzer/pkg/github"
 )
 
 var ErrorNothingToReport error = errors.New("no error in test to report")
@@ -49,13 +53,13 @@ func (f *FlakeReport) PostReportAsPullRequestComment(option ...filterOption) (*s
 		return nil, ErrorNothingToReport
 	}
 
-	//ctx := context.Background()
-	//client := github.NewRepositoryClient(ctx, f.filter.token, f.filter.owner, f.filter.repo, false)
-	//pr, err := strconv.Atoi(f.filter.pullRequest)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//err = client.PostPRComment(ctx, pr, report)
+	ctx := context.Background()
+	client := github.NewRepositoryClient(ctx, f.filter.token, f.filter.owner, f.filter.repo, false)
+	pr, err := strconv.Atoi(f.filter.pullRequest)
+	if err != nil {
+		return nil, err
+	}
+	err = client.PostPRComment(ctx, pr, report)
 
 	return report, err
 }

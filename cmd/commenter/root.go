@@ -1,10 +1,12 @@
 package main
 
 import (
-	"github.com/operator-framework/flak-analyzer/pkg/artifacts/commenter"
+	"os"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"os"
+
+	"github.com/operator-framework/flak-analyzer/pkg/artifacts/commenter"
 )
 
 var rootCmd = &cobra.Command{
