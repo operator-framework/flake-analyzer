@@ -38,12 +38,9 @@ var rootCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		comments, err := cf.GenerateComments()
+		_, err = cf.GenerateComments()
 		if err != nil {
 			return err
-		}
-		for _, c := range comments {
-			os.Stdout.Write([]byte(*c))
 		}
 
 		return nil
