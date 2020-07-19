@@ -10,7 +10,6 @@ jobs:
       - uses: actions/checkout@v2
       - name: Comment On PR
         env:
-          PR: "1645"
           OWNER: operator-framework
           REPO: operator-lifecycle-manager
           LOWNER: operator-framework
