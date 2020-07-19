@@ -1,17 +1,26 @@
 name: Post Report As Comment On PR
-on: [repository_dispatch]
-check_run:
+on:
+  pull_request:
+  schedule:
+    - cron: '*/15 * * * *'
 jobs:
   post-report-as-pr-comment:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2      
+      - uses: actions/checkout@v2
       - name: Comment On PR
-        if: github.event.action == 'comment'
         env:
-          PR: ${{github.event.client_payload.pr}}
-          OWNER: ${{github.event.client_payload.owner}}
-          REPO: ${{github.event.client_payload.repo}}
-          TEST_SUITE: ${{github.event.client_payload.test_suite}}
-          TOKEN: ${{secrets.GITHUB_TOKEN}}
-        run: make comment-on-pr
+          PR: "1645"
+          OWNER: operator-framework
+          REPO: operator-lifecycle-manager
+          LOWNER: operator-framework
+          LREPO: flake-analyzer
+          TEST_SUITE: e2e-test-output
+          PROGRESS_FILE: ./artifacts/commenter-progress-flake-bot.yaml
+          ARTIFACT: flake-bot-operator-fw-artifact
+          TOKEN: ${{secrets.BOWEN_BOT}}
+        run: make commenter
+      - uses: actions/upload-artifact@v2
+        with:
+          name: flake-bot-operator-fw-artifact
+          path: ./artifacts/commenter-progress-flake-bot.yaml

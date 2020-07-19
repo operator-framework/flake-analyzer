@@ -1,4 +1,4 @@
-package loader
+package reporter
 
 import (
 	"context"
@@ -204,7 +204,12 @@ func (f *FlakeReport) LoadReport(option ...filterOption) error {
 			f.filter.commit = strings.Join(commits, "|")
 		}
 
-		parttern := f.filter.testsuite + "-" + f.filter.commit
+		var pattern string
+		if f.filter.testsuite != "" && f.filter.commit != "" {
+			pattern = f.filter.testsuite + "-(" + f.filter.commit + ")"
+		} else {
+			pattern = f.filter.testsuite + f.filter.commit
+		}
 
 		chErr := make(chan error)
 		var arNames []string
@@ -221,7 +226,7 @@ func (f *FlakeReport) LoadReport(option ...filterOption) error {
 					return
 				}
 				defer os.RemoveAll(tmpDir)
-				d, err := client.DownloadArtifacts(ctx, ar, tmpDir, parttern, f.filter.from, f.filter.to)
+				d, err := client.DownloadArtifacts(ctx, ar, tmpDir, pattern, f.filter.from, f.filter.to)
 				if err != nil {
 					chErr <- fmt.Errorf("no artifact has been downlaoded %v", err)
 					return
@@ -246,7 +251,7 @@ func (f *FlakeReport) LoadReport(option ...filterOption) error {
 			return err
 		default:
 			log.Infof("Downloaded %d artifacts from %s/%s with filter '%s' from %v to %v", len(arNames), f.filter.owner,
-				f.filter.repo, parttern, f.filter.from, f.filter.to)
+				f.filter.repo, pattern, f.filter.from, f.filter.to)
 		}
 
 	}

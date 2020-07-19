@@ -1,4 +1,4 @@
-package loader
+package reporter
 
 import (
 	"archive/zip"
@@ -52,7 +52,7 @@ func unwrapArtifactZip(file string) (*artifact, error) {
 		return nil, fmt.Errorf("artifact is not following the formate <test-name>-<commit>-<run id>")
 	}
 
-	raw, err := unzip(file)
+	raw, err := Unzip(file)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func unwrapArtifactZip(file string) (*artifact, error) {
 	}, nil
 }
 
-func unzip(src string) ([]byte, error) {
+func Unzip(src string) ([]byte, error) {
 	r, err := zip.OpenReader(src)
 	if err != nil {
 		return nil, err
