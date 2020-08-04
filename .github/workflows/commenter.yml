@@ -17,7 +17,7 @@ jobs:
           TEST_SUITE: e2e-test-output
           PROGRESS_FILE: ./artifacts/commenter-progress-flake-bot.yaml
           ARTIFACT: flake-bot-operator-fw-artifact
-          TOKEN: ${{secrets.BOWEN_BOT}}
+          TOKEN: ${{secrets.FLAKE_BOT_SECRET}}
         run: make commenter
       - uses: actions/upload-artifact@v2
         with:
