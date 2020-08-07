@@ -87,6 +87,28 @@ func (f *CommenterFile) GenerateComments() ([]*string, error) {
 			return nil, err
 		}
 		for _, prc := range prcs {
+			// Only consider new Runs
+			hasFailedRuns := false
+			for _, id := range prc.newRunIDs {
+				idnum, err := strconv.ParseInt(id, 10, 64)
+				if err != nil {
+					return nil, err
+				}
+				fw, _, err := f.client.Actions.GetWorkflowRunByID(ctx, c.Owner, c.Repo, idnum)
+				if err != nil {
+					return nil, err
+				}
+
+				// Only comment on the PR if new runs failed.
+				if fw.GetConclusion() == "failure" {
+					hasFailedRuns = true
+				}
+			}
+
+			if !hasFailedRuns {
+				continue
+			}
+
 			report := reporter.NewFlakeReport()
 			if err = report.LoadReport(reporter.RepositoryInfo(c.Owner, c.Repo), reporter.WithToken(c.token),
 				reporter.FilterPR(strconv.Itoa(prc.pr)),
@@ -170,17 +192,18 @@ func (f *CommenterFile) getLatestCommenterFile(ctx context.Context) error {
 }
 
 //get all open PR in repo
-// get runID list
+// get runIDs list
 // get all artifacts in REPO
-// get all runID from PR,commits
+// get all runIDs from PR,commits
 // filter runIDs
 // write report for PR
-// upload new runID list
+// upload new runIDs list
 
 type pullRequest struct {
-	pr      int
-	commits []string
-	runID   []string
+	pr        int
+	commits   []string
+	runIDs    []string
+	newRunIDs []string
 }
 
 func (c *Commenter) generatePRComments(ctx context.Context) ([]pullRequest, error) {
@@ -216,7 +239,7 @@ func (c *Commenter) generatePRComments(ctx context.Context) ([]pullRequest, erro
 	}
 
 	var pullRequests []pullRequest
-	 updatedRunIDs := map[string]struct{}{}
+	updatedRunIDs := map[string]struct{}{}
 	for _, pr := range PRs {
 		commitNums, err := c.client.ListCommitsFromPR(ctx, pr.GetNumber())
 		if err != nil {
@@ -230,30 +253,31 @@ func (c *Commenter) generatePRComments(ctx context.Context) ([]pullRequest, erro
 		for _, id := range runIDs {
 			updatedRunIDs[id] = struct{}{}
 		}
-
-		if c.hasAllRunIDs(runIDs) {
+		newRunIds := c.newRunIDs(runIDs)
+		if len(newRunIds) == 0 {
 			continue
 		}
 
 		pullRequests = append(pullRequests, pullRequest{
-			pr:      pr.GetNumber(),
-			commits: commitNums,
-			runID:   runIDs,
+			pr:        pr.GetNumber(),
+			commits:   commitNums,
+			runIDs:    runIDs,
+			newRunIDs: newRunIds,
 		})
 	}
 	c.RunIDs = updatedRunIDs
 	return pullRequests, nil
-
 }
 
-// hasAllRunIDs checks if commenter listed all the runIDs there are. It returns true is runIDs is nil]
-func (c *Commenter) hasAllRunIDs(runIDs []string) bool {
+// newRunIDs returns new runs than the commenter listed runIDs.
+func (c *Commenter) newRunIDs(runIDs []string) []string {
+	var newIds []string
 	for _, id := range runIDs {
 		if _, ok := c.RunIDs[id]; !ok {
-			return false
+			newIds = append(newIds, id)
 		}
 	}
-	return true
+	return newIds
 }
 
 func (c *Commenter) listPRs(ctx context.Context) ([]*github.PullRequest, error) {

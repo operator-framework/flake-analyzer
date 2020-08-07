@@ -47,8 +47,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: <Your Test>
-      - name: Archive production artifacts # test results are only uploaded if any of the e2e tests fails
-        if: ${{ failure() }}
+      - name: Archive production artifacts 
+        if: ${{ always() }}
         uses: actions/upload-artifact@v2
         with:
           name: <Test Suite Name>-${{(github.event.pull_request.head.sha||github.sha)}}-${{ github.run_id }}
@@ -79,7 +79,7 @@ jobs:
           make report-today  OUTPUT_FILE=./report/artifacts/flake-report-today-$(date +"%m-%d-%Y").yaml
           make report-last-7-days OUTPUT_FILE=./report/artifacts/flake-report-last-7-days-$(date +"%m-%d-%Y").yaml
           make report-prev-7-days OUTPUT_FILE=./report/artifacts/flake-report-prev-7-days-$(date +"%m-%d-%Y").yaml
-      - name: Archive Reoport artifacts # test results are only uploaded if any of the e2e tests fails
+      - name: Archive Reoport artifacts 
         uses: actions/upload-artifact@v2
         with:
           name: flake-report-${{ github.run_id }}

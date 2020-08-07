@@ -14,7 +14,8 @@ import (
 var ErrorNothingToReport error = errors.New("no error in test to report")
 
 type HtmlFlakeReport struct {
-	TotalTestCount   int             `json:"total_test_count",omitempty`   // All imported test reports have failures
+	TotalTestCount   int             `json:"total_test_count",omitempty` // All imported test reports have failures
+	FailedTestCount  int             `json:"failed_test_count",omitempty`
 	FlakeTestCount   int             `json:"flake_test_count",omitempty`   // Number of test suit report
 	SkippedTestCount int             `json:"skipped_test_count",omitempty` // Number of test suit report
 	FlakeTests       []HtmlTestEntry `json:"flake_tests",omitempty`        // Sorted by counts and number of commits
@@ -108,7 +109,8 @@ func (f *FlakeReport) generateReportComment() (*string, error) {
 	}
 
 	data, err := yaml.Marshal(HtmlFlakeReport{
-		TotalTestCount:   f.TotalTestCount,
+		TotalTestCount: f.TotalTestCount,
+		FailedTestCount:f.FailedTestCount,
 		FlakeTestCount:   f.FlakeTestCount,
 		SkippedTestCount: f.SkippedTestCount,
 		FlakeTests:       shortFlakeTests,
@@ -118,8 +120,8 @@ func (f *FlakeReport) generateReportComment() (*string, error) {
 		return nil, err
 	}
 
-	report := fmt.Sprintf("This PR **failed tests for %d times** with %d individual failed tests and %d skipped tests."+
-		" A test is considered flaky if failed on multiple commits. \n<details>\n\n %v",
-		f.TotalTestCount, f.FlakeTestCount, f.SkippedTestCount, string(data))
+	report := fmt.Sprintf("This PR **failed %d out of %d times** with %d individual failed tests and %d" +
+		" skipped tests. A test is considered flaky if failed on multiple commits. \n<details>\n\n %v",
+		f.FailedTestCount,f.TotalTestCount, f.FlakeTestCount, f.SkippedTestCount, string(data))
 	return &report, nil
 }

@@ -16,7 +16,7 @@ const (
 )
 
 func TestNewCommenter(t *testing.T) {
-	cf, err := NewCommenter(owner, commenterRepo, token, "flake-bot-operator-fw-artifact","")
+	cf, err := NewCommenter(owner, commenterRepo, token, "flake-bot-operator-fw-artifact", "")
 	require.NoError(t, err)
 	err = cf.AddRepo(owner, repo, token, testName)
 	require.NoError(t, err)
