@@ -21,14 +21,16 @@ import (
 )
 
 type FlakeReport struct {
-	filter           reportFilter
-	TotalTestCount   int         `json:"total_test_count"`      // All imported test reports have failures
-	FlakeTestCount   int         `json:"flake_test_count"`      // Number of test suit report
-	SkippedTestCount int         `json:"skipped_test_count"`    // Number of test suit report
-	FlakeTests       []TestEntry `json:"flake_tests",omitempty` // Sorted by counts and number of commits
-	SkippedTests     []TestEntry `json:"skipped_tests",omitempty`
-	flakeTestMap     testMap     // map[class name + test name]TestEntry
-	skippedTestMap   testMap
+	filter               reportFilter
+	TotalTestCount       int         `json:"total_test_count"`      // All imported test reports
+	FailedTestCount      int         `json:"failed_test_count"`     // All imported test reports have failures
+	FlakeTestCount       int         `json:"flake_test_count"`      // Number of test suit report
+	SkippedTestCount     int         `json:"skipped_test_count"`    // Number of test suit report
+	FlakeTests           []TestEntry `json:"flake_tests",omitempty` // Sorted by counts and number of commits
+	SkippedTests         []TestEntry `json:"skipped_tests",omitempty`
+	flakeTestMap         testMap     // map[class name + test name]TestEntry
+	skippedTestMap       testMap
+	mostRecentTestFailed bool // boolean to indicate if the latest test failed
 }
 
 type testMap map[string]TestEntry
@@ -163,13 +165,14 @@ func (r *reportFilter) complete() error {
 
 func NewFlakeReport() *FlakeReport {
 	return &FlakeReport{
-		filter:         reportFilter{},
-		TotalTestCount: 0,
-		FlakeTestCount: 0,
-		FlakeTests:     []TestEntry{},
-		SkippedTests:   []TestEntry{},
-		flakeTestMap:   map[string]TestEntry{},
-		skippedTestMap: map[string]TestEntry{},
+		filter:          reportFilter{},
+		TotalTestCount:  0,
+		FailedTestCount: 0,
+		FlakeTestCount:  0,
+		FlakeTests:      []TestEntry{},
+		SkippedTests:    []TestEntry{},
+		flakeTestMap:    map[string]TestEntry{},
+		skippedTestMap:  map[string]TestEntry{},
 	}
 }
 
@@ -316,7 +319,11 @@ func (f *FlakeReport) addTests(dir string) error {
 			return err
 		}
 
+		testSuiteFailed := false
 		for _, s := range suits {
+			if s.Totals.Failed != 0 || s.Totals.Error != 0 {
+				testSuiteFailed = true
+			}
 			for _, t := range s.Tests {
 				switch t.Status {
 				case junit.StatusPassed:
@@ -330,6 +337,9 @@ func (f *FlakeReport) addTests(dir string) error {
 			}
 		}
 
+		if testSuiteFailed {
+			f.FailedTestCount = f.FailedTestCount + 1
+		}
 		f.TotalTestCount = f.TotalTestCount + 1
 	}
 	return nil
